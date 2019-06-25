@@ -1,6 +1,6 @@
 {
     "name": "pixelcollective/netlify-deploy",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "type": "wp-plugin",
     "license": "MIT",
     "authors": [
@@ -11,8 +11,6 @@
     ],
     "homepage": "https://tinypixel.dev",
     "require": {
-        "guzzlehttp/guzzle": "^6.3",
-        "monolog/monolog": "^1.24",
-        "bjornjohansen/wplang": "^0.1.1"
+        "guzzlehttp/guzzle": "^6.3"
     }
 }
