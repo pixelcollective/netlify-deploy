@@ -1,7 +1,7 @@
 {
     "name": "pixelcollective/netlify-deploy",
-    "version": "0.0.3",
-    "type": "wp-plugin",
+    "version": "0.0.4",
+    "type": "wordpress-plugin",
     "license": "MIT",
     "authors": [
       {
