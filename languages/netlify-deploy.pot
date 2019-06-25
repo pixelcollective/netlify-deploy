@@ -1,0 +1,81 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2019-06-25 13:33-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: netlify-deploy.php:62
+msgid "Netlify Deploy"
+msgstr ""
+
+#: netlify-deploy.php:63
+msgid "Tiny Pixel Collective, LLC"
+msgstr ""
+
+#: netlify-deploy.php:92
+msgid "Netlify Deploy Runtime Error"
+msgstr ""
+
+#: netlify-deploy.php:94
+msgid "There was a problem with the plugin."
+msgstr ""
+
+#: netlify-deploy.php:95
+msgid "The plugin has been deactivated."
+msgstr ""
+
+#: netlify-deploy.php:97
+msgid "Plugin Administration ⌫"
+msgstr ""
+
+#: netlify-deploy.php:216
+#, php-format
+msgid "You must be using PHP %s or greater."
+msgstr ""
+
+#: netlify-deploy.php:220
+#, php-format
+msgid "Invalid PHP version (%s)"
+msgstr ""
+
+#: netlify-deploy.php:236
+#, php-format
+msgid "You must be using WordPress %s or greater"
+msgstr ""
+
+#: netlify-deploy.php:240
+#, php-format
+msgid "Invalid WordPress version (%s)"
+msgstr ""
+
+#: netlify-deploy.php:255
+msgid ""
+"Netlify Deploy needs to be installed in order to be run.<br />Run "
+"<code>composer install</code> from the plugin directory."
+msgstr ""
+
+#: netlify-deploy.php:256
+msgid "Autoloader not found."
+msgstr ""
+
+#: netlify-deploy.php:270
+#, php-format
+msgid "The <code>%s%s</code> variable must be present."
+msgstr ""
+
+#: netlify-deploy.php:274
+msgid "Netlify webhook not found."
+msgstr ""

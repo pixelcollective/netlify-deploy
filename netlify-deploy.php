@@ -8,49 +8,95 @@
  * Author URI:      https://tinypixel.dev
  * License:         MIT License
  * Text Domain:     netlify-deploy
- * Domain Path:     /resources/lang
+ * Domain Path:     /languages
  */
 
 namespace TinyPixel;
 
-class NetlifyDeploy
-{
+(new class {
+
     /**
-     * Construct
+     * Base string for envvars
+     * @var string
+     */
+    public $netlifyEnv = 'NETLIFY_WEBHOOK_';
+
+    /**
+     * Composer autoload location
+     * @var string
+     */
+    public $composer = __DIR__ . '/vendor/autoload.php';
+
+    /**
+     * PostTypes that result in called webhook
+     * @var array
+     */
+    public $postTypes = [
+        'post',
+        'page',
+    ];
+
+    /**
+     * Setup class parameters
      */
     public function __construct()
     {
-        // Plugin meta
+        /**
+         * Environmental variables
+         * @var string
+         */
+        $this->currentEnv = strtoupper(env('WP_ENV'));
+
+        /**
+         * Server PHP profile
+         * @var string
+         */
+        $this->php = phpversion();
+
+        /**
+         * Plugin profile & references
+         * @var object
+         */
         $this->plugin = (object) [
-            'composer' => __DIR__ . '/vendor/autoload.php',
+            'ref'      => plugin_basename(__FILE__),
+            'name'     => __('Netlify Deploy', 'netlify-deploy'),
+            'author'   => __('Tiny Pixel Collective, LLC', 'netlify-deploy'),
+            'link'     => 'https://tinypixel.dev/netlify-deploy',
+            'license'  => 'MIT',
             'requires' => (object) [
                 'php'  => '7.2',
                 'wp'   => '5.2',
             ],
+            'translationDir' => basename(dirname(__FILE__)) . '/languages',
         ];
 
-        // WP/server information
-        $this->site = (object) [
-            'env' => env('WP_ENV'),
-            'php' => phpversion(),
-            'wp'  => get_bloginfo('version'),
-        ];
-
-        // Netlify webhooks from .env
-        $this->netlify = (object) [
-            'hooks' => (object) [
-                'development' => env('NETLIFY_WEBHOOK_DEVELOPMENT'),
-                'staging'     => env('NETLIFY_WEBHOOK_STAGING'),
-                'production'  => env('NETLIFY_WEBHOOK_PRODUCTION'),
+        /**
+         * WordPress profile & references
+         * @var object
+         */
+        $this->wp = (object) [
+            'version'     => get_bloginfo('version'),
+            'adminLinks'  => (object) [
+                'plugins' => admin_url('plugins.php'),
+            ],
+            'lib' => (object) [
+                'plugins' => ABSPATH . 'wp-admin/includes/plugin.php',
             ],
         ];
 
         /**
-         * Trigger build on these hooks
+         * Error message template string defaults
+         * @var object
          */
-        $this->hooks = [
-            'publish_post',
-            'publish_page',
+        $this->errorDefaults = (object) [
+            'title'    => __('Netlify Deploy Runtime Error', 'netlify-deploy'),
+            'subtitle' => '',
+            'body'     => __('There was a problem with the plugin.', 'netlify-deploy'),
+            'footer'   => __('The plugin has been deactivated.', 'netlify-deploy'),
+            'link' => [
+                'link_text' => __('Plugin Administration ⌫', 'netlify-deploy'),
+                'link_url'  => $this->wp->adminLinks->plugins,
+            ],
         ];
     }
 
@@ -59,118 +105,311 @@ class NetlifyDeploy
      */
     public function run()
     {
-        // preflight compat checks
-        $this->checkPHPVersion()
+        // preflight
+        $this->loadTextDomain()
+                ->checkPHPVersion()
                 ->checkWPVersion()
+                ->checkEnv()
                 ->checkComposer();
 
-        // setup http client
-        $this->clientInit();
-
-        /**
-         * @link https://codex.wordpress.org/Plugin_API/Action_Reference/publish_post
-         */
-        foreach ($this->hooks as $hook) {
-            add_action($hook, [$this, 'onPublish'], 10, 2);
-        }
+        // business
+        $this->setupClient()
+                ->setupNetlifyWebhooks()
+                ->hookPublish();
     }
 
     /**
-     * Initialize http client for webhook request
+     * Initializes http client for webhook request
+     * @return self $this
      */
-    public function clientInit()
+    public function setupClient()
     {
-        // load container dependencies
-        require $this->plugin->composer;
+        // load dependencies
+        require $this->composer;
 
         // instantiate guzzle for POST req
         $this->client = new \GuzzleHttp\Client(['headers' => [
             'Content-Type' => 'application/json',
         ]]);
+
+        return $this;
     }
 
     /**
-     * POST to appropriate webhook on publish actions
+     * Sets webhook URLs for POSTing
+     * @return self $this
      */
-    public function onPublish($ID, $post)
+    private function setupNetlifyWebhooks()
     {
-        // set the netlify hook as specified for the current env
-        switch ($this->site->env) :
-            case 'development':
+        $this->netlify = (object) [
+            'hooks' => (object) [
+                'development' => env("{$this->netlifyEnv}DEVELOPMENT"),
+                'staging'     => env("{$this->netlifyEnv}STAGING"),
+                'production'  => env("{$this->netlifyEnv}PRODUCTION"),
+            ],
+        ];
+
+        has_filter('netlify_webhooks') &&
+            apply_filters('netlify_webhooks', $this->netlify->hooks);
+
+        return $this;
+    }
+
+    /**
+     * Hooks into WordPress lifecycle
+     */
+    private function hookPublish()
+    {
+        // mile high
+        foreach ($this->getPostTypes() as $type) {
+            add_action("publish_{$type}", [
+                $this, 'onPublish'
+            ], 10, 2);
+        }
+    }
+
+    /**
+     * Fields PostTypes that are set to trigger webhook
+     * @return array $postTypes
+     */
+    private function getPostTypes()
+    {
+        has_filter('netlify_posttypes') &&
+            apply_filters('netlify_posttypes', $this->postTypes);
+
+        return $this->postTypes;
+    }
+
+    /**
+     * POSTs to appropriate webhook on publish actions
+     */
+    public function onPublish()
+    {
+        // set the netlify hook based on envvar
+        switch ($this->currentEnv) :
+            case 'DEVELOPMENT':
                 $this->hook = $this->netlify->hooks->development;
                 break;
 
-            case 'staging':
+            case 'STAGING':
                 $this->hook = $this->netlify->hooks->staging;
                 break;
 
-            case 'production':
+            case 'PRODUCTION':
                 $this->hook = $this->netlify->hooks->production;
                 break;
         endswitch;
 
         // make the run
-        if (isset($this->hook)) {
+        $this->hook &&
             $this->client->post($this->hook);
-        }
     }
 
     /**
      * Checks for minimum PHP version compatibility
+     * @return self $this
      */
     private function checkPHPVersion()
     {
-        if (version_compare($this->plugin->requires->php, $this->site->php, '>')) {
-            $this->error(
-                __('You must be using PHP'. $this->plugin->requires->php .'or greater.', 'netlify-deploy'),
-                __("Invalid PHP version ({$this->site->php})", 'netlify-deploy')
-            );
-        }
+        version_compare($this->plugin->requires->php, $this->php, '>') && $this->error([
+            'body' => sprintf(
+                __('You must be using PHP %s or greater.', 'netlify-deploy'),
+                $this->plugin->requires->php,
+            ),
+            'subtitle' => sprintf(
+                __('Invalid PHP version (%s)', 'netlify-deploy'),
+                $this->php,
+            ),
+        ]);
 
         return $this;
     }
 
     /**
      * Checks for minimum WordPress version compatibility
+     * @return self $this
      */
     private function checkWPVersion()
     {
-        if (version_compare($this->plugin->requires->wp, $this->site->wp, '>')) {
-            $this->error(
-                __('You must be using WordPress'. $this->plugin->requires->wp .'or greater.', 'netlify-deploy'),
-                __("Invalid WordPress version ({$this->site->wp})", 'netlify-deploy')
-            );
-        }
+        version_compare($this->plugin->requires->wp, $this->wp->version, '>') && $this->error([
+            'body' => sprintf(
+                __('You must be using WordPress %s or greater', 'netlify-deploy'),
+                $this->plugin->requires->wp,
+            ),
+            'subtitle' => sprintf(
+                __('Invalid WordPress version (%s)', 'netlify-deploy'),
+                $this->wp->version,
+            ),
+        ]);
 
         return $this;
     }
 
     /**
      * Checks for vendor dependencies
+     * @return self $this
      */
     private function checkComposer()
     {
-        if (!file_exists($this->plugin->composer)) {
-            $this->error(
-                __('You must run <code>composer install</code> from the "Netlify Deploy" plugin directory.', 'netlify-deploy'),
-                __('Autoloader not found.', 'netlify-deploy')
-            );
-        }
+        !file_exists($this->composer) && $this->error([
+            'body'     => __('Netlify Deploy needs to be installed in order to be run.<br />Run <code>composer install</code> from the plugin directory.', 'netlify-deploy'),
+            'subtitle' => __('Autoloader not found.', 'netlify-deploy'),
+        ]);
 
         return $this;
     }
 
     /**
-     * Displays error message
+     * Checks for environment variables
+     * @return self $this
      */
-    private function error($message, $subtitle = '', $title = '')
+    private function checkEnv()
     {
-        $title = $title ?: __('Netlify Deploy Runtime Error', 'netlify-deploy');
-        $footer = '<a href="https://tinypixel.dev/plugins/netlify-deploy/">tinypixel.dev/plugins/netlify-deploy/</a>';
-        $message = "<h1>{$title}<br><small>{$subtitle}</small></h1><p>{$message}</p><p>{$footer}</p>";
+        !env("{$this->netlifyEnv}{$this->currentEnv}") && $this->error([
+            'body' => sprintf(
+                __("The <code>%s%s</code> variable must be present.", 'netlify-deploy'),
+                $this->netlifyEnv,
+                $this->currentEnv
+            ),
+            'subtitle' => __('Netlify webhook not found.', 'netlify-deploy'),
+        ]);
 
-        wp_die($message, $title);
+        return $this;
     }
-}
 
-(new NetlifyDeploy())->run();
+    /**
+     * Load plugin translations
+     */
+    private function loadTextDomain()
+    {
+        load_plugin_textdomain('netlify-deploy', false, $this->plugin->translationDir);
+
+        return $this;
+    }
+
+    /**
+     * Handles deactivating plugin and displaying errors
+     * @param array $error
+     */
+    private function error($error)
+    {
+        // deactivate self
+        $this->forceEjectPlugin();
+
+        // get formatted error variables
+        $dirge = $this->processError($error);
+
+        // bear the bad news
+        wp_die(
+            $dirge->message,
+            $dirge->title,
+            $dirge->link,
+        );
+    }
+
+    /**
+     * Immediately deactivate plugin regardless of WordPress lifecycle
+     */
+    private function forceEjectPlugin()
+    {
+        // this runs too late for deactivation
+        // so we just manually include the function
+        require_once $this->wp->lib->plugins;
+
+        is_plugin_active($this->plugin->ref) &&
+            deactivate_plugins($this->plugin->ref);
+    }
+
+    /**
+     * Processes error message for display to user
+     *
+     * @param array $error
+     * @return object $error
+     */
+    private function processError($error)
+    {
+        $error = is_array($error) ? (object) $error : $error;
+
+        $errorObj = (object) [
+            'title'    => $this->errorTitle($error),
+            'subtitle' => $this->errorSubtitle($error),
+            'body'     => $this->errorBody($error),
+            'footer'   => $this->errorFooter($error),
+            'link'     => $this->errorLink($error),
+        ];
+
+        $errorObj->message = $this->errorMessage($errorObj);
+
+        return $errorObj;
+    }
+
+    /**
+     * Formats error message
+     * @return string
+     */
+    private function errorMessage($error)
+    {
+        return sprintf(
+            "<h1>%s<br><small>%s</small></h1><p>%s</p><p>%s</p>",
+            $error->title,
+            $error->subtitle,
+            $error->body,
+            $error->footer,
+        );
+    }
+
+    /**
+     * Returns error title from error object
+     * @return string
+     */
+    private function errorTitle($error)
+    {
+        return isset($error->title)
+            ? $error->title
+            : $this->errorDefaults->title;
+    }
+
+    /**
+     * Returns error subtitle from error object
+     * @return string
+     */
+    private function errorSubtitle($error)
+    {
+        return isset($error->subtitle)
+            ? $error->subtitle
+            : $this->errorDefaults->subtitle;
+    }
+
+    /**
+     * Returns error body from error object
+     * @return string
+     */
+    private function errorBody($error)
+    {
+        return isset($error->body)
+            ? $error->body
+            : $this->errorDefaults->body;
+    }
+
+    /**
+     * Returns error link from error object
+     * @return string
+     */
+    private function errorLink($error)
+    {
+        return isset($error->link)
+            ? $error->link
+            : $this->errorDefaults->link;
+    }
+
+    /**
+     * Returns footer from error object
+     * @return string
+     */
+    private function errorFooter($error)
+    {
+        return isset($error->footer)
+            ? $error->footer
+            : $this->errorDefaults->footer;
+    }
+})->run();
