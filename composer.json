@@ -1,0 +1,21 @@
+{
+    "name": "pixelcollective/netlify-deploy",
+    "version": "0.0.4",
+    "type": "wordpress-plugin",
+    "license": "MIT",
+    "authors": [
+      {
+        "name": "Kelly Mears",
+        "email": "developers@tinypixel.dev"
+      }
+    ],
+    "homepage": "https://tinypixel.dev",
+    "require": {
+        "guzzlehttp/guzzle": "^6.3"
+    },
+    "autoload": {
+      "psr-4": {
+        "TinyPixel\\": ""
+      }
+    }
+}
