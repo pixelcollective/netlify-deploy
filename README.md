@@ -36,9 +36,9 @@ add_filter('netlify_posttypes', [
 ]);
 ```
 
-### netlify_webhoks
+### netlify_webhooks
 
-If you don't want to use env variables because you don't have a deployment strategy and enjoy living poorly you can also hoook into the `netlify_hooks` filter and pass your own array of webhooks to use instead.
+You can modify your webhooks at runtime using the `netlify_hooks` filter:
 
 ```php
 add_filter('netlify_hooks', [
@@ -48,6 +48,30 @@ add_filter('netlify_hooks', [
 ])
 ```
 
+### netlify_env_override
+
+If you don't want to use env variables because you don't have a deployment strategy and enjoy living poorly you can hook into the `netlify_env_override` filter and pass the target webhook directly at runtime:
+
+```php
+add_filter('netlify_env_override', 'https://api.netlify.com/build_hooks/########');
+```
+
+### netlify_transitions
+
+Change the post status transitions which trigger a build. Usage with the default values is shown below:
+
+```php
+add_filter('netlify_transitions', [
+  'draft_to_publish',
+  'publish_to_draft',
+  'publish_to_trash',
+  'publish_to_private',
+  'private_to_public',
+  'new_to_publish',
+]);
+```
+
+You can learn more about the [`Post Status Transitions` API in the Codex](https://codex.wordpress.org/Post_Status_Transitions).
 
 ## Happy static publishing!
 

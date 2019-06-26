@@ -7,6 +7,10 @@ use function \admin_url;
 
 class Error
 {
+    /**
+     * Construct
+     * @param \TinyPixel\NetlifyDeployPlugin
+     */
     public function __construct($plugin)
     {
         $this->plugin = $plugin;
@@ -53,6 +57,10 @@ class Error
         wp_die($dirge, $message->title, $message->subtitle);
     }
 
+    /**
+     * Get default error message title
+     * @return i18n formatted string
+     */
     public static function defaultTitle()
     {
         return __(
@@ -61,6 +69,10 @@ class Error
         );
     }
 
+    /**
+     * Get default error message subtitle
+     * @return i18n formatted string
+     */
     public static function defaultSubtitle()
     {
         return __(
@@ -69,6 +81,10 @@ class Error
         );
     }
 
+    /**
+     * Get default error message body
+     * @return i18n formatted string
+     */
     public static function defaultBody()
     {
         return __(
@@ -77,6 +93,10 @@ class Error
         );
     }
 
+    /**
+     * Get default error message footer
+     * @return i18n formatted string
+     */
     public static function defaultFooter()
     {
         return __(
@@ -85,6 +105,10 @@ class Error
         );
     }
 
+    /**
+     * Get default error message link
+     * @return array link
+     */
     public static function defaultLink()
     {
         return [

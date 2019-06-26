@@ -13,6 +13,19 @@ class Netlify
     {
         $this->plugin = $plugin;
 
+        /**
+         * Post Status Transitions
+         */
+        $this->transitions = [
+            'draft_to_publish',
+            'publish_to_draft',
+            'publish_to_trash',
+            'publish_to_private',
+            'private_to_public',
+            'new_to_publish',
+        ];
+
+
         return $this;
     }
 
@@ -31,14 +44,45 @@ class Netlify
     }
 
     /**
-     * Return hook for a given environment
+     * Hooks into WordPress lifecycle
+     * @return self $this
      */
-    public static function getNetlifyHook($environment)
+    public function addActions()
     {
-        return (object) [
-            'key'   => "NETLIFY_WEBHOOK_{$environment}",
-            'value' => env("NETLIFY_WEBHOOK_{$environment}")
-        ];
+        foreach ($this->transitions as $transition) {
+            add_action($transition, [
+                $this, 'onStatusTransition'
+            ], 10, 3);
+        }
+
+        foreach ($this->postTypes as $postType) {
+            add_action("publish_{$postType}", [
+                $this, 'postToWebhook',
+            ], 10, 2);
+        }
+
+        return $this;
+    }
+
+    /**
+     * On Status Transition
+     * @param WP_Post $post
+     */
+    public function onStatusTransition($post)
+    {
+        if (in_array($post->post_type, $this->postTypes)) {
+            $this->postToWebhook();
+        }
+    }
+
+    /**
+     * POSTs to appropriate webhook on publish actions
+     */
+    public function postToWebhook()
+    {
+        // make the run
+        $this->targetHook &&
+            $this->client->post($this->targetHook);
     }
 
     /**
@@ -56,6 +100,23 @@ class Netlify
         return $this;
     }
 
+    /**
+     * Return hook for a given environment
+     * @param string $environment
+     * @return object
+     */
+    public static function getNetlifyHook($environment)
+    {
+        return (object) [
+            'key'   => "NETLIFY_WEBHOOK_{$environment}",
+            'value' => env("NETLIFY_WEBHOOK_{$environment}"),
+        ];
+    }
+
+    /**
+     * Filters webhooks at runtime
+     * @return self $this
+     */
     public function filterWebhooks()
     {
         has_filter('netlify_webhooks') &&
@@ -65,16 +126,15 @@ class Netlify
     }
 
     /**
-     * Hooks into WordPress lifecycle
+     * Filters envvar overrides
+     * @return self $this
      */
-    public function addActions()
+    public function filterOverrides()
     {
-        // mile high
-        foreach ($this->postTypes as $type) {
-            add_action("publish_{$type}", [
-                $this, 'onPublish'
-            ], 10, 2);
-        }
+        $this->override = '';
+
+        has_filter('netlify_env_override') &&
+            apply_filters('netlify_env_override', $this->override);
 
         return $this;
     }
@@ -84,7 +144,7 @@ class Netlify
      * @param array postTypes
      * @return self $this
      */
-    public function usePostTypes()
+    public function filterPostTypes()
     {
         has_filter('netlify_posttypes') &&
             apply_filters('netlify_posttypes', $this->plugin->postTypes);
@@ -95,27 +155,31 @@ class Netlify
     }
 
     /**
-     * POSTs to appropriate webhook on publish actions
+     * Post status transitions
+     * @var array
      */
-    public function onPublish()
+    public function filterTransitions()
     {
-        // set the netlify hook based on envvar
-        switch ($this->plugin->runtime->env) :
-            case 'DEVELOPMENT':
-                $this->hook = $this->hooks->development;
-                break;
+        has_filter('netlify_transitions') &&
+            apply_filters('netlify_transitions', $this->transitions);
 
-            case 'STAGING':
-                $this->hook = $this->hooks->staging;
-                break;
+        return $this;
+    }
 
-            case 'PRODUCTION':
-                $this->hook = $this->hooks->production;
-                break;
-        endswitch;
+    /**
+     * Set target hook, accounting for overrides
+     * @return self $this
+     */
+    public function setTargetHook()
+    {
+        if ($this->override !== '') {
+            $this->targetHook = $this->override;
+        } elseif ($this->plugin->runtime->env) {
+            $this->targetHook = self::getNetlifyHook(
+                $this->plugin->runtime->env
+            )->value;
+        }
 
-        // make the run
-        $this->hook &&
-            $this->client->post($this->hook);
+        return $this;
     }
 }

@@ -133,9 +133,12 @@ class NetlifyDeployPlugin
     {
         $this->container->netlify
             ->setupClient()
-            ->usePostTypes()
             ->setWebhooks()
+            ->filterPostTypes()
             ->filterWebhooks()
+            ->filterTransitions()
+            ->filterOverrides()
+            ->setTargetHook()
             ->addActions();
     }
 
@@ -238,14 +241,15 @@ class NetlifyDeployPlugin
             $this->runtime->env
         );
 
-        (!$webhook->value && !has_filter('netlify_webhooks')) &&
+        if (!$webhook->value && !(has_filter('netlify_webhooks') || has_filter('netlify_env_override'))) {
             $this->container->error::throw([
-                'body' => sprintf(__(
-                    "The <code>%s</code> variable must be present.",
-                    'netlify-deploy'
-                ), $webhook->key, $this->runtime->env),
-                'subtitle' => __('Netlify webhook not found.', 'netlify-deploy'),
-            ]);
+                    'body' => sprintf(__(
+                        "The <code>%s</code> variable must be present.",
+                        'netlify-deploy'
+                    ), $webhook->key, $this->runtime->env),
+                    'subtitle' => __('Netlify webhook not found.', 'netlify-deploy'),
+                ]);
+        }
 
         return $this;
     }
