@@ -35,7 +35,7 @@
 ## Install
 
 ```sh
-composer require pixelcollective\netlify-deploy
+composer require pixelcollective/netlify-deploy
 ```
 
 ## Usage
